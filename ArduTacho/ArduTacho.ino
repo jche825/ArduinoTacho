@@ -8,10 +8,18 @@
 #define EI_NOTEXTERNAL
 #define EI_NOTPORTC
 
+#define SERIAL_TEST_SCRIPT
+
 // Define global constants
+#ifdef SERIAL_TEST_SCRIPT
+// Define Serial parameters
+static constexpr uint16_t SERIAL_BAUD_RATE    = 9600;
+static constexpr uint16_t SERIAL_PRINT_PERIOD = 2000;
+#else
 // Define I2C parameters
 static constexpr uint8_t  SLAVE_ADDR  = 0x6F;
 static constexpr uint32_t I2C_CLOCK   = 400000;
+#endif
 
 // Define pin change interrupt pins for sensors
 static constexpr uint8_t PIN_PROP1 = 2;
@@ -43,6 +51,11 @@ unsigned long *indPropEnd[N_PROPS];
 int8_t pinIdxFlag = -1;
 rpmUnion propRPM;
 
+#ifdef SERIAL_TEST_SCRIPT
+// Define timer variables
+unsigned long lastMillis;
+#endif
+
 void setup() {
   // Initialise sensor pins with INPUT_PULLUP resistors and enable pin change interrupts on FALLING edge of sensor pins
   pinMode(PIN_PROP1, INPUT_PULLUP);
@@ -62,10 +75,15 @@ void setup() {
   pinMode(PIN_PROP8, INPUT_PULLUP);
   enableInterrupt(PIN_PROP8,ISR_Prop8,FALLING);
 
+#ifdef SERIAL_TEST_SCRIPT
+  // Initialise Serial communication
+  Serial.begin(SERIAL_BAUD_RATE);
+#else
   // Initialise I2C communication as slave
   Wire.begin(SLAVE_ADDR);
   Wire.setClock(I2C_CLOCK);
   Wire.onRequest(I2C_Request);
+#endif
 
   // Initialise index pointers for timeCountsProp array
   for (int i = 0; i < N_PROPS; i++) {
@@ -110,12 +128,23 @@ void loop() {
     // Enable interrupts
     interrupts();
   }
+
+#ifdef SERIAL_TEST_SCRIPT
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastMillis >= SERIAL_PRINT_PERIOD) {
+    Serial.println(propRPM.rpmUInt[0]);
+    lastMillis = currentMillis;
+  }
+#endif
+
 }
 
+#ifndef SERIAL_TEST_SCRIPT
 // Return RPM data on I2C request
 void I2C_Request() {
   Wire.write(propRPM.rpmByte, sizeof(propRPM));
 }
+#endif
 
 // Propeller pin ISRs
 void ISR_Prop1() {
