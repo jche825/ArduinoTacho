@@ -8,20 +8,22 @@
 #define EI_NOTEXTERNAL
 #define EI_NOTPORTC
 
+// Define to selectively compile either Serial console or I2C communication
 #define SERIAL_TEST_SCRIPT
 
 // Define global constants
 #ifdef SERIAL_TEST_SCRIPT
 // Define Serial parameters
 static constexpr uint16_t SERIAL_BAUD_RATE    = 9600;
-static constexpr uint16_t SERIAL_PRINT_PERIOD = 2000;
+static constexpr uint16_t SERIAL_PRINT_PERIOD = 2000;     // Serial output print time in ms
 #else
 // Define I2C parameters
-static constexpr uint8_t  SLAVE_ADDR  = 0x6F;
-static constexpr uint32_t I2C_CLOCK   = 400000;
+static constexpr uint8_t  SLAVE_ADDR  = 0x6F;             // Arbitrarily chosen I2C address
+static constexpr uint32_t I2C_CLOCK   = 400000;           // I2C communication speed in Hz
 #endif
 
 // Define pin change interrupt pins for sensors
+//  All on digital pins
 static constexpr uint8_t PIN_PROP1 = 2;
 static constexpr uint8_t PIN_PROP2 = 3;
 static constexpr uint8_t PIN_PROP3 = 4;
@@ -52,7 +54,7 @@ int8_t pinIdxFlag = -1;
 rpmUnion propRPM;
 
 #ifdef SERIAL_TEST_SCRIPT
-// Define timer variables
+// Define serial timer variable
 unsigned long lastMillis;
 #endif
 
