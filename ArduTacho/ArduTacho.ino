@@ -25,6 +25,7 @@ static constexpr uint32_t I2C_CLOCK   = 400000;           // I2C communication s
 // Define pin change interrupt pins for sensors
 //  All on digital pins
 static constexpr uint8_t PIN_PROP1 = 2;
+/*
 static constexpr uint8_t PIN_PROP2 = 3;
 static constexpr uint8_t PIN_PROP3 = 4;
 static constexpr uint8_t PIN_PROP4 = 5;
@@ -32,9 +33,10 @@ static constexpr uint8_t PIN_PROP5 = 6;
 static constexpr uint8_t PIN_PROP6 = 7;
 static constexpr uint8_t PIN_PROP7 = 8;
 static constexpr uint8_t PIN_PROP8 = 9;
+*/
 
 // Define number of propellers on aircraft and size of moving average for propellers
-static constexpr uint8_t N_PROPS      = 8;
+static constexpr uint8_t N_PROPS      = 1;
 static constexpr uint8_t TIME_COUNTS  = 5;       // N_PROPS * TIME_COUNTS < 255 for N_PROPS = 8; TIME_COUNTS < 30
 static constexpr unsigned long AVG_MICRO_TO_RPM = TIME_COUNTS * 60000000;
 
@@ -56,12 +58,14 @@ rpmUnion propRPM;
 #ifdef SERIAL_TEST_SCRIPT
 // Define serial timer variable
 unsigned long lastMillis;
+bool ledFlag;
 #endif
 
 void setup() {
   // Initialise sensor pins with INPUT_PULLUP resistors and enable pin change interrupts on FALLING edge of sensor pins
   pinMode(PIN_PROP1, INPUT_PULLUP);
   enableInterrupt(PIN_PROP1,ISR_Prop1,FALLING);
+  /*
   pinMode(PIN_PROP2, INPUT_PULLUP);
   enableInterrupt(PIN_PROP2,ISR_Prop2,FALLING);
   pinMode(PIN_PROP3, INPUT_PULLUP);
@@ -76,6 +80,9 @@ void setup() {
   enableInterrupt(PIN_PROP7,ISR_Prop7,FALLING);
   pinMode(PIN_PROP8, INPUT_PULLUP);
   enableInterrupt(PIN_PROP8,ISR_Prop8,FALLING);
+  */
+
+  pinMode(LED_BUILTIN, OUTPUT);
 
 #ifdef SERIAL_TEST_SCRIPT
   // Initialise Serial communication
@@ -137,6 +144,12 @@ void loop() {
     Serial.println(propRPM.rpmUInt[0]);
     lastMillis = currentMillis;
   }
+
+  if (digitalRead(2) == HIGH) {
+    digitalWrite(LED_BUILTIN, HIGH);
+  } else {
+    digitalWrite(LED_BUILTIN, LOW);
+  }
 #endif
 
 }
@@ -153,6 +166,7 @@ void ISR_Prop1() {
   pinIdxFlag = 0;
 }
 
+/*
 void ISR_Prop2() {
   pinIdxFlag = 1;
 }
@@ -180,3 +194,4 @@ void ISR_Prop7() {
 void ISR_Prop8() {
   pinIdxFlag = 7;
 }
+*/
