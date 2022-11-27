@@ -151,10 +151,10 @@ void loop() {
 
     // Reset check flags
     resetCheckFlag = true;
-    resetTimer = micros();
+    resetTimer = millis();
   }
 
-  if (resetCheckFlag && (micros() - resetTimer) > TIME_TO_RESET) {
+  if (resetCheckFlag && (millis() - resetTimer) > TIME_TO_RESET) {
     // Reset all memory if TIME_TO_RESET is exceeded
     reset();
   }
