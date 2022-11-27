@@ -162,7 +162,12 @@ void loop() {
 #ifdef SERIAL_TEST_SCRIPT
   unsigned long currentMillis = millis();
   if (currentMillis - lastMillis >= SERIAL_PRINT_PERIOD) {
-    Serial.println(propRPM.rpmUInt[0]);
+    for (int i = 0; i < N_PROPS; i++) {
+      Serial.print(propRPM.rpmUInt[i]);
+      Serial.print(" ");
+    }
+
+    Serial.println();
     lastMillis = currentMillis;
   }
 
