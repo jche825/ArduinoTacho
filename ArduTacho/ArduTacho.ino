@@ -34,24 +34,28 @@ static constexpr uint8_t PIN_PROP7 = 8;
 static constexpr uint8_t PIN_PROP8 = 9;
 
 // Define number of propellers on aircraft and size of moving average for propellers
-static constexpr uint8_t N_PROPS      = 8;
-static constexpr uint8_t TIME_COUNTS  = 5;       // N_PROPS * TIME_COUNTS < 255 for N_PROPS = 8; TIME_COUNTS < 30
-static constexpr unsigned long AVG_MICRO_TO_RPM = TIME_COUNTS * 60000000;
+static constexpr uint8_t        N_PROPS           = 8;
+static constexpr uint8_t        TIME_COUNTS       = 5;                        // N_PROPS * TIME_COUNTS < 255 for N_PROPS = 8; TIME_COUNTS < 30
+static constexpr unsigned long  AVG_MICRO_TO_RPM  = TIME_COUNTS * 60000000;
+static constexpr unsigned long  TIME_TO_RESET     = 2000;                     // Time without a propeller edge detected before reset occurs in millis
 
 // Define RPM union so RPM data stored as uint can be sent as individual bytes during Wire.write()
 union rpmUnion {
-  unsigned int rpmUInt[N_PROPS];
-  byte rpmByte[sizeof(int) * N_PROPS];
+  unsigned int  rpmUInt[N_PROPS];
+  byte          rpmByte[sizeof(int) * N_PROPS];
 };
 
 // Define global variables
+unsigned long *indProp[N_PROPS];
+unsigned long *indPropEnd[N_PROPS];
+int8_t        pinIdxFlag = -1;
+bool          resetCheckFlag = true;
+unsigned long resetTimer;
+bool          countStarted[N_PROPS];
 unsigned long timeLastProp[N_PROPS];
 unsigned long timeCountsProp[TIME_COUNTS * N_PROPS];
 unsigned long timeCountsSum[N_PROPS];
-unsigned long *indProp[N_PROPS];
-unsigned long *indPropEnd[N_PROPS];
-int8_t pinIdxFlag = -1;
-rpmUnion propRPM;
+rpmUnion      propRPM;
 
 #ifdef SERIAL_TEST_SCRIPT
 // Define serial timer variable
@@ -98,37 +102,54 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   if (pinIdxFlag != -1) {
-    // Disable interrupts
-    noInterrupts();
+    // Temporarily store pin index in case ISR trips mid way through operation and changes index
+    int8_t tempPinIdx = pinIdxFlag;
 
     // Store current time in micros
     unsigned long timeNow = micros();
 
-    // Remove oldest recorded time for this propeller from sum
-    timeCountsSum[pinIdxFlag] -= *indProp[pinIdxFlag];
-
-    // Overwrite oldest time step for this propeller
-    *indProp[pinIdxFlag] = timeNow - timeLastProp[pinIdxFlag];
-    timeLastProp[pinIdxFlag] = timeNow;
-
-    // Add new time to sum
-    timeCountsSum[pinIdxFlag] += *indProp[pinIdxFlag];
-
-    // Move index pointer to new oldest time for this propeller
-    if (indProp[pinIdxFlag] == indPropEnd[pinIdxFlag]) {
-      indProp[pinIdxFlag] -= TIME_COUNTS - 1;        
-    } else {
-      indProp[pinIdxFlag]++;
-    }
-    
-    // Calculate RPM
-    propRPM.rpmUInt[pinIdxFlag] = AVG_MICRO_TO_RPM / timeCountsSum[pinIdxFlag];
-
-    // Reset pin flag
+    // Reset pin flag index
     pinIdxFlag = -1;
 
-    // Enable interrupts
-    interrupts();
+    // Check if flag has been tripped
+    if (countStarted[tempPinIdx]) {
+      // Remove oldest recorded time for this propeller from sum
+      timeCountsSum[tempPinIdx] -= *indProp[tempPinIdx];
+
+      // Overwrite oldest time step for this propeller
+      *indProp[tempPinIdx] = timeNow - timeLastProp[tempPinIdx];
+
+      // Add new time to sum
+      timeCountsSum[tempPinIdx] += *indProp[tempPinIdx];
+
+      // Calculate RPM, disable interrupts for this operation to prevent chance of memory corruption
+      noInterrupts();
+      propRPM.rpmUInt[tempPinIdx] = AVG_MICRO_TO_RPM / timeCountsSum[tempPinIdx];
+      interrupts();
+
+    } else {
+      // Set flag to true
+      countStarted[tempPinIdx] = true;
+    }
+
+    // Replace last recorded time with current time
+    timeLastProp[tempPinIdx] = timeNow;
+
+    // Move index pointer to new oldest time for this propeller
+    if (indProp[tempPinIdx] == indPropEnd[tempPinIdx]) {
+      indProp[tempPinIdx] -= TIME_COUNTS - 1;
+    } else {
+      indProp[tempPinIdx]++;
+    }
+
+    // Reset check flags
+    resetCheckFlag = true;
+    resetTimer = millis();
+  }
+
+  if (resetCheckFlag && (millis() - resetTimer) > TIME_TO_RESET) {
+    // Reset all memory if TIME_TO_RESET is exceeded
+    reset();
   }
 
 #ifdef SERIAL_TEST_SCRIPT
@@ -147,6 +168,26 @@ void I2C_Request() {
   Wire.write(propRPM.rpmByte, sizeof(propRPM));
 }
 #endif
+
+void reset() {
+  // Disable interrupts
+  noInterrupts();
+
+  // Reset check flag
+  resetCheckFlag = false;
+  
+  // Reset count flags for all propellers
+  countStarted[sizeof(countStarted)] = {false};
+
+  // Reset stored time and RPM values
+  memset(timeLastProp,    0, sizeof(timeLastProp));
+  memset(timeCountsProp,  0, sizeof(timeCountsProp));
+  memset(timeCountsSum,   0, sizeof(timeCountsSum));
+  memset(propRPM.rpmByte, 0, sizeof(propRPM.rpmByte));
+
+  // Enable interrupts
+  interrupts();
+}
 
 // Propeller pin ISRs
 void ISR_Prop1() {
